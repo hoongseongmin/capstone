@@ -1,0 +1,28 @@
+# 가상환경
+venv/
+env/
+.env/
+.venv/
+ENV/
+
+# Python 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 로컬 개발 환경 설정
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 배포 관련
+dist/
+build/
+*.egg-info/
+
+# 개인 설정 파일
+.env
+.DS_Store

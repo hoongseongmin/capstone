@@ -1,0 +1,13 @@
+# requirements.txt
+# FastAPI 프레임워크 및 서버
+fastapi==0.103.1
+uvicorn==0.23.2
+
+# 데이터베이스 드라이버
+mysql-connector-python==8.1.0
+
+# 데이터 검증 및 직렬화
+pydantic==2.3.0
+
+# 타입 힌팅 지원
+typing-extensions==4.7.1
