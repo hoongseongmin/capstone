@@ -36,7 +36,7 @@
 |--------|------------|------|
 | POST | `/users` | 사용자 생성 |
 | POST | `/users/login` | 로그인 |
-| GET | `/users/{user_id}` | 사용자 정보 조회 |
+| GET | `/users/{user_id}` | 사용자 정보 조회 |`
 | PUT | `/users/{user_id}` | 사용자 정보 업데이트 |
 
 ### 거래 관리
@@ -104,6 +104,8 @@ python -m venv venv
 # 가상 환경 활성화
 # Windows:
 .\venv\Scripts\activate
+# 실행
+.\run.bat
 
 # 추가 패키지 설치
 pip install pyjwt

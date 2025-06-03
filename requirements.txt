@@ -8,6 +8,24 @@ mysql-connector-python==8.1.0
 
 # 데이터 검증 및 직렬화
 pydantic==2.3.0
+pydantic-settings==2.0.3
 
 # 타입 힌팅 지원
 typing-extensions==4.7.1
+
+# 데이터 처리 및 분석
+pandas==2.0.3
+numpy==1.24.3
+
+# 엑셀 파일 처리
+openpyxl==3.1.2
+xlrd==2.0.1
+
+# JWT 토큰 처리
+PyJWT==2.8.0
+
+# 파일 업로드 처리
+python-multipart==0.0.6
+
+# 정규표현식 및 텍스트 처리 (기본 내장이지만 명시)
+# re는 파이썬 내장 모듈이므로 별도 설치 불필요

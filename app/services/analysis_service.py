@@ -470,3 +470,162 @@ class AnalysisService:
             "generated_date": datetime.now(),
             "insights": insights
         }
+    
+
+    # 기존 파일에 추가해야 할 코드
+# app/services/analysis_service.py 내의 AnalysisService 클래스에 다음 메소드들을 추가합니다.
+
+from app.repositories.reference_data_repository import ReferenceDataRepository
+from app.repositories.user_category_ratio_repository import UserCategoryRatioRepository
+from app.models.user_category_ratio import UserCategoryRatio
+
+# __init__ 메소드에 추가
+def __init__(self, connection: MySQLConnection):
+    """
+    AnalysisService 초기화
+    
+    Args:
+        connection: MySQL 데이터베이스 연결 객체
+    """
+    self.connection = connection
+    self.transaction_repository = TransactionRepository(connection)
+    self.user_repository = UserRepository(connection)
+    # 아래 두 줄 추가
+    self.reference_data_repository = ReferenceDataRepository(connection)
+    self.user_category_ratio_repository = UserCategoryRatioRepository(connection)
+
+# 새로운 메소드 추가
+def calculate_user_category_ratios(self, user_id: int, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+    """
+    특정 기간 동안의 사용자 카테고리별 지출 비율 계산
+    
+    Args:
+        user_id: 사용자 ID
+        start_date: 시작 날짜
+        end_date: 종료 날짜
+    
+    Returns:
+        List[Dict[str, Any]]: 카테고리별 지출 비율
+    """
+    # 사용자의 카테고리별 지출 가져오기
+    category_summary = self.transaction_repository.get_summary_by_category(user_id, start_date, end_date)
+    
+    # 총 지출 계산
+    total_spending = sum(item['total_amount'] for item in category_summary)
+    
+    # 카테고리별 비율 계산
+    category_ratios = []
+    for item in category_summary:
+        ratio = round(item['total_amount'] / total_spending, 4) if total_spending > 0 else 0
+        
+        ratio_data = UserCategoryRatio(
+            id=None,
+            user_id=user_id,
+            category_id=item['category_id'],
+            ratio=ratio,
+            avg_amount=item['total_amount'] / item['transaction_count'] if item['transaction_count'] > 0 else 0,
+            period_start=start_date,
+            period_end=end_date
+        )
+        
+        # 데이터베이스에 저장
+        self.user_category_ratio_repository.create(ratio_data)
+        
+        category_ratios.append({
+            'category_id': item['category_id'],
+            'category_name': item['category_name'],
+            'ratio': ratio,
+            'avg_amount': ratio_data.avg_amount,
+            'total_amount': item['total_amount']
+        })
+    
+    return sorted(category_ratios, key=lambda x: x['ratio'], reverse=True)
+
+def compare_with_reference_data(self, user_id: int) -> Dict[str, Any]:
+    """
+    사용자의 지출 패턴과 참조 데이터 비교
+    
+    Args:
+        user_id: 사용자 ID
+    
+    Returns:
+        Dict[str, Any]: 비교 결과
+    """
+    # 사용자 정보 가져오기
+    user = self.user_repository.get_by_id(user_id)
+    if not user:
+        return {"error": "사용자를 찾을 수 없습니다."}
+    
+    # 사용자의 최근 카테고리별 지출 비율 가져오기
+    user_ratios = self.user_category_ratio_repository.get_by_user_id(user_id)
+    
+    # 동일 인구통계에 대한 참조 데이터 가져오기
+    age_group = self._get_age_group(user['age'])
+    reference_data = self.reference_data_repository.get_by_demographic(
+        age_group=age_group,
+        occupation=user['occupation'],
+        region=user['address'],
+        income_level=user['income_level'] or '미상',
+        gender=user['gender']
+    )
+    
+    # 비교 결과 생성
+    comparison_result = []
+    for user_cat in user_ratios:
+        ref_cat = next((item for item in reference_data if item['category_id'] == user_cat['category_id']), None)
+        
+        if ref_cat:
+            diff_percentage = ((user_cat['ratio'] - ref_cat['spending_ratio']) / ref_cat['spending_ratio']) * 100 if ref_cat['spending_ratio'] > 0 else 0
+            
+            comparison_result.append({
+                "category_id": user_cat['category_id'],
+                "category_name": user_cat['category_name'],
+                "user_ratio": user_cat['ratio'],
+                "reference_ratio": ref_cat['spending_ratio'],
+                "diff_percentage": round(diff_percentage, 2),
+                "diff_status": "높음" if diff_percentage > 15 else ("낮음" if diff_percentage < -15 else "평균"),
+                "user_avg_amount": user_cat['avg_amount'],
+                "reference_avg_amount": ref_cat['avg_amount']
+            })
+    
+    # 사용자에게 없지만 참조 데이터에 있는 카테고리 추가
+    user_category_ids = [item['category_id'] for item in user_ratios]
+    missing_categories = [
+        {
+            "category_id": ref['category_id'],
+            "category_name": ref['category_name'],
+            "user_ratio": 0,
+            "reference_ratio": ref['spending_ratio'],
+            "diff_percentage": -100,
+            "diff_status": "없음",
+            "user_avg_amount": 0,
+            "reference_avg_amount": ref['avg_amount']
+        }
+        for ref in reference_data if ref['category_id'] not in user_category_ids
+    ]
+    
+    comparison_result.extend(missing_categories)
+    
+    return {
+        "user_id": user_id,
+        "user_name": user['name'],
+        "age_group": age_group,
+        "occupation": user['occupation'],
+        "region": user['address'],
+        "income_level": user['income_level'] or '미상',
+        "gender": user['gender'],
+        "comparison": sorted(comparison_result, key=lambda x: x['reference_ratio'], reverse=True)
+    }
+
+def _get_age_group(self, age: int) -> str:
+    """
+    나이를 기준으로 연령대 그룹 반환
+    
+    Args:
+        age: 사용자 나이
+    
+    Returns:
+        str: 연령대 그룹 (20대, 30대 등)
+    """
+    decade = (age // 10) * 10
+    return f"{decade}대"

@@ -142,3 +142,60 @@ def generate_insights(
     
     db.close()
     return result
+
+# 기존 파일에 추가할 코드
+
+@router.post("/user/{user_id}/calculate-ratios")
+def calculate_user_category_ratios(
+    user_id: int,
+    start_date: datetime,
+    end_date: datetime, 
+    db: MySQLConnection = Depends(get_db_connection)
+):
+    """
+    특정 기간 동안의 사용자 카테고리별 지출 비율을 계산하는 엔드포인트
+    
+    Args:
+        user_id: 사용자 ID
+        start_date: 시작 날짜
+        end_date: 종료 날짜
+        db: 데이터베이스 연결 객체
+    
+    Returns:
+        List[Dict[str, Any]]: 카테고리별 지출 비율
+    """
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+    
+    service = AnalysisService(db)
+    result = service.calculate_user_category_ratios(user_id, start_date, end_date)
+    
+    db.close()
+    return result
+
+@router.get("/user/{user_id}/reference-comparison")
+def compare_with_reference_data(
+    user_id: int,
+    db: MySQLConnection = Depends(get_db_connection)
+):
+    """
+    사용자의 지출 패턴과 참조 데이터를 비교하는 엔드포인트
+    
+    Args:
+        user_id: 사용자 ID
+        db: 데이터베이스 연결 객체
+    
+    Returns:
+        Dict[str, Any]: 비교 결과
+    """
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+    
+    service = AnalysisService(db)
+    result = service.compare_with_reference_data(user_id)
+    
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    
+    db.close()
+    return result
